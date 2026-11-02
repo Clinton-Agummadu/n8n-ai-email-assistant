@@ -1,0 +1,449 @@
+{
+  "name": "AI Email Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Please analyze and process the following incoming email:\n\nFrom: {{ $json.from.text }}\nSubject: {{ $json.subject }}\nEmail Body: {{ $json.text }}\nDate: {{ $json.date }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "=# ROLE & PERSONALITY You are an executive-level AI Email Analyst and Operations Assistant. Your job is to process incoming business emails, categorize them accurately, assign appropriate priority levels, generate concise summaries, and draft professional, human-sounding replies.  - Tone: Professional, clear, empathetic, and concise. - Style: Direct and human-like. Avoid overly formal corporate fluff, robotic phrasing, or artificial placeholders.  ---  # RESPONSIBILITIES  1. **Email Categorization:** Classify every incoming email into EXACTLY ONE of the following categories:    - Sales: Inquiries about purchasing products, pricing requests, demo bookings, or business proposals.    - Support: Technical issues, bug reports, product help, or service complaints.    - Billing: Invoices, payment confirmations, refund requests, or subscription questions.    - Partnerships: Integration offers, joint venture pitches, affiliate requests, or collaboration inquiries.    - Jobs: Resumes, job applications, interview follow-ups, or recruiter outreach.    - Others: General chatter, news updates, uncategorized inquiries, or ambiguous messages.  2. **Priority Assignment:** Assign a priority level based on urgency:    - High: Critical service outages, urgent billing issues, high-value sales deals, or immediate escalations.    - Medium: Standard support requests, general sales inquiries, and standard partnership leads.    - Low: Newsletters, cold outreach, low-urgency general inquiries, or job applications.  3. **Summary Generation:** Provide a 1-to-2 sentence executive summary capturing the core intent of the sender.  4. **Draft Reply Generation:** Draft a helpful, context-aware reply ready for human review.    - Sign off naturally as \"Operations Team\".    - If key information is missing to resolve the request, politely request clarification in the draft.  ---  # RESTRICTIONS & RULES  - Output MUST strictly be valid JSON matching the specified schema. - Do NOT output raw markdown wrapper blocks like ` ```json ` if instructed to return raw text. - Never guess critical account details or fake promises regarding refunds/discounts. - If an email is ambiguous, set category to \"Others\", priority to \"Low\", and flag `requires_human_review` as true.  ---  # OUTPUT JSON SCHEMA {   \"category\": \"Sales\" | \"Support\" | \"Billing\" | \"Partnerships\" | \"Jobs\" | \"Others\",   \"priority\": \"High\" | \"Medium\" | \"Low\",   \"summary\": \"String\",   \"draft_reply\": \"String\",   \"requires_human_review\": boolean }"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        -256,
+        80
+      ],
+      "id": "ba1defb4-9cbf-4494-8f9d-4c081bace5d5",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Grab the trigger data safely\nconst trigger = $('Email Trigger (IMAP)').first().json;\n\n// Extract email and name safely across different IMAP payload structures\nlet senderEmail = '';\nlet senderName = '';\n\nif (trigger.from && trigger.from.value && trigger.from.value[0]) {\n  senderEmail = trigger.from.value[0].address || '';\n  senderName = trigger.from.value[0].name || senderEmail;\n} else if (trigger.from && trigger.from.text) {\n  senderEmail = trigger.from.text;\n  senderName = trigger.from.text;\n} else if (typeof trigger.from === 'string') {\n  senderEmail = trigger.from;\n  senderName = trigger.from;\n}\n\nreturn $input.all().map(item => {\n  let parsedJson = {};\n  \n  // Safely parse the text output coming from Gemini\n  try {\n    const rawText = item.json.text || item.json.output || '';\n    // Clean code blocks if LLM wraps output in ```json\n    const cleanedText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();\n    parsedJson = JSON.parse(cleanedText);\n  } catch (e) {\n    parsedJson = {\n      category: \"Others\",\n      priority: \"Low\",\n      summary: \"Could not parse response\",\n      draft_reply: item.json.text || \"\"\n    };\n  }\n\n  return {\n    json: {\n      ...parsedJson,\n      client_email: senderEmail,\n      client_name: senderName\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        80
+      ],
+      "id": "ca7efa27-156d-47dd-8ad3-68ba316f2e96",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Sales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "ee1c7f0a-bf78-4dd3-8e6a-b641e5aae42e"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Sales"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3f6ce311-79dc-4424-b18d-a64a5573e8f6",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Support",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Support"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "db8d00c7-7c5d-4e0a-94d7-6336aa535a56",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Billing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Billing"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "ab95d2cd-700a-4fa6-8e48-6e35269e9814",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Partnerships",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Partnerships"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "89f151c7-32ad-43e4-a267-e3d2ba1fac4d",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Jobs",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Jobs"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c52fa2e6-1460-4307-a423-e8e84260b618",
+                    "leftValue": "={{ $json.category }}",
+                    "rightValue": "Others",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Others"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        16
+      ],
+      "id": "89d1e5ab-ca60-4fb2-a1ba-81296f851794",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "downloadAttachments": true,
+        "options": {
+          "forceReconnect": 5,
+          "trackLastMessageId": true
+        }
+      },
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        -736,
+        96
+      ],
+      "id": "b80465cd-02b7-485c-b406-2393d0650fcd",
+      "name": "Email Trigger (IMAP)",
+      "credentials": {
+        "imap": {
+          "id": "ICAMbULtE6ITDjAF",
+          "name": "IMAP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        -176,
+        336
+      ],
+      "id": "09886f81-aed3-41fa-b867-db936c0ea52f",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "CmZMvkHys7sB1b3h",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "=automationbot@odogwu.site",
+        "toEmail": "=teclaz751@gmail.com",
+        "subject": "=Re: {{ $('Email Trigger (IMAP)').item.json.subject }}",
+        "html": "=<div style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;\">\n  <div style=\"background-color: #f4f6f8; border-left: 4px solid #007bff; padding: 12px; margin-bottom: 20px;\">\n    <h4 style=\"margin: 0 0 8px 0; color: #007bff;\">📩 CLIENT DETAILS</h4>\n    <strong>From:</strong> {{ $('Email Trigger (IMAP)').item.json.from.value[0].name }} (&lt;{{ $('Email Trigger (IMAP)').item.json.from.value[0].address }}&gt;)<br>\n    <strong>Category:</strong> {{ $json.category }} | <strong>Priority:</strong> {{ $json.priority }}<br>\n    <strong>Summary:</strong> {{ $json.summary }}\n  </div>\n\n  <h4 style=\"margin: 0 0 10px 0; color: #28a745;\">🤖 AI PROPOSED DRAFT REPLY:</h4>\n  \n  <div style=\"background-color: #ffffff; border: 1px solid #e0e0e0; padding: 15px; border-radius: 6px; white-space: pre-wrap;\">\n{{ $json.draft_reply }}\n  </div>\n</div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $json.client_email }}"
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        736,
+        80
+      ],
+      "id": "63924961-227a-4642-8b5b-08f63af8b3a1",
+      "name": "Send an Email",
+      "webhookId": "b59de678-302e-4aae-8881-1547484700db",
+      "credentials": {
+        "smtp": {
+          "id": "BPNZ6tAC7Ou88gaQ",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bdc9b5be-9af6-42c1-a1b7-2ec926f99334",
+              "leftValue": "={{ $json.from.value[0].address }}",
+              "rightValue": "automationbot@odogwu.site",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            },
+            {
+              "id": "82b3371c-0858-49eb-8f9f-98d40579c959",
+              "leftValue": "={{ $json.subject }}",
+              "rightValue": "=Re",
+              "operator": {
+                "type": "string",
+                "operation": "notContains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -544,
+        96
+      ],
+      "id": "1fcd2258-bdf0-4eb4-b401-471a21479574",
+      "name": "If"
+    }
+  ],
+  "pinData": {
+    "Email Trigger (IMAP)": [
+      {
+        "json": {
+          "from": {
+            "text": "john@enterprise.com",
+            "value": [
+              {
+                "address": "john@enterprise.com",
+                "name": "John Doe"
+              }
+            ]
+          },
+          "subject": "Enterprise Pricing Inquiry",
+          "text": "Hi team, we are looking to onboard 50 seats for our company. Could you provide custom pricing and a demo link?",
+          "date": "2026-11-01T12:00:00.000Z"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "45305aea-6673-4bd6-94d4-05193ddeeefa",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "13ff3582439a99c8dc80561afe729fccd8e5ecb467e032acc521d2dc3b6fc2df"
+  },
+  "nodeGroups": [],
+  "id": "wViBNdRpaO77RsVO",
+  "tags": []
+}
